@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Live Feed with Snapshot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    #video-container {
+      position: relative;
+      display: inline-block;
+      margin-bottom: 20px;
+    }
+    #videoFeed {
+      border: 1px solid #ccc;
+    }
+    #snapshotImg {
+      border: 1px solid #ccc;
+      margin-top: 20px;
+    }
+    .button-container {
+      margin: 20px;
+    }
+    #measurementInfo {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Live Video Feed with Snapshot</h1>
+  
+  <!-- Live video feed -->
+  <div id="video-container">
+    <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Live Video Feed" width="1080" height="720">
+  </div>
+  
+  <!-- Snapshot buttons -->
+  <div class="button-container">
+    <button onclick="takeSnapshot(3)">Snapshot 3 sec</button>
+    <button onclick="takeSnapshot(5)">Snapshot 5 sec</button>
+    <button onclick="takeSnapshot(10)">Snapshot 10 sec</button>
+  </div>
+  
+  <!-- Display snapshot -->
+  <h2>Snapshot:</h2>
+  <img id="snapshotImg" src="" alt="Snapshot will appear here" width="1080" height="720">
+  
+  <!-- Display measurement info and recommended size -->
+  <div id="measurementInfo">
+    <h3>Measurement Sizes:</h3>
+    <div id="sizes"></div>
+    <h3>Recommended Apparel Size:</h3>
+    <div id="apparelSize"></div>
+  </div>
+  
+  <script>
+    function takeSnapshot(duration) {
+      fetch(`/snapshot?duration=${duration}`)
+        .then(response => response.blob())
+        .then(blob => {
+          document.getElementById('snapshotImg').src = URL.createObjectURL(blob);
+          // After snapshot is taken, retrieve measurement sizes from the server.
+          fetch('/measurements')
+            .then(response => response.json())
+            .then(data => {
+              displayMeasurements(data);
+            })
+            .catch(error => console.error('Error fetching measurements:', error));
+        })
+        .catch(error => console.error('Error taking snapshot:', error));
+    }
+    
+    function displayMeasurements(data) {
+      const sizesDiv = document.getElementById('sizes');
+      // Convert raw measurements to inches using same conversion factors as server:
+      // Chest: /10.2, Shoulder: /8.4, Hip: /5.8, Thigh: /9.3
+      let chestInches = (data['Chest Circumference'] / 10.2).toFixed(2);
+      let shoulderInches = (data['Shoulder Width'] / 8.4).toFixed(2);
+      let hipInches = (data['Hip Length'] / 5.8).toFixed(2);
+      let thighInches = (data['Thigh Circumference'] / 9.3).toFixed(2);
+      
+      sizesDiv.innerHTML = `
+        Chest Circumference: ${chestInches} inch<br>
+        Shoulder Width: ${shoulderInches} inch<br>
+        Hip Length: ${hipInches} inch<br>
+        Thigh Circumference: ${thighInches} inch
+      `;
+      
+      // Calculate recommended apparel size based on chest measurement:
+      let recommended = recommendedApparelSize(parseFloat(chestInches));
+      document.getElementById('apparelSize').innerText = recommended;
+    }
+    
+    function recommendedApparelSize(chest) {
+      // Example thresholds (in inches) for recommendation:
+      if (chest < 30) {
+        return "Extra Small";
+      } else if (chest < 34) {
+        return "Small";
+      } else if (chest < 38) {
+        return "Medium";
+      } else if (chest < 42) {
+        return "Large";
+      } else {
+        return "Extra Large";
+      }
+    }
+  </script>
+</body>
+</html>

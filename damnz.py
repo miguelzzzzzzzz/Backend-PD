@@ -1,55 +1,45 @@
+from flask import Flask, render_template, Response, request, jsonify
 import cv2
 import mediapipe as mp
 import math
 import time
-import tkinter as tk
-from PIL import Image, ImageTk
 
-# Initialize MediaPipe Pose and drawing utilities.
+app = Flask(__name__)
+
+# Setup MediaPipe Pose (shared settings)
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
-# Global variable to store the last computed measurements and pose landmarks.
-last_measurements = {
-    'Chest Circumference': None,
-    'Shoulder Length': None,
-    'Hip Circumference': None,
-    'Thigh Circumference': None,
+# Global variables for measurements, last clean frame, and snapshot request info.
+last_measurements = {}
+last_frame = None
+snapshot_request = {
+    "active": False,
+    "duration": 0,
+    "start_time": None
 }
-last_pose_landmarks = None  # Stores the last detected pose landmarks
 
-# Function to calculate Euclidean distance between two normalized landmarks in pixel space.
 def calculate_distance(point1, point2, image_width, image_height):
     x1, y1 = int(point1.x * image_width), int(point1.y * image_height)
     x2, y2 = int(point2.x * image_width), int(point2.y * image_height)
     return math.hypot(x2 - x1, y2 - y1)
 
-# Function to update measurements based on detected landmarks.
-def update_measurements_extended(landmarks, image_width, image_height):
+def update_measurements(landmarks, image_width, image_height):
     global last_measurements
-    # Calibration factors (adjust these as needed).
     chest_factor = 2.5
     hip_factor   = 2.7
     thigh_factor = 2.5
 
-    # Chest Circumference: distance between left and right shoulders times factor.
     chest_width = calculate_distance(
         landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value],
         landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value],
         image_width, image_height)
     chest_circumference = chest_width * chest_factor
-
-    # Shoulder Length: raw distance between left and right shoulders.
     shoulder_length = chest_width
-
-
     hip_length = calculate_distance(
         landmarks[mp_pose.PoseLandmark.LEFT_HIP.value],
         landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value],
         image_width, image_height)
-  
-
-    # Thigh Circumference: distance from left hip to left knee times factor.
     thigh_length = calculate_distance(
         landmarks[mp_pose.PoseLandmark.LEFT_HIP.value],
         landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value],
@@ -64,16 +54,13 @@ def update_measurements_extended(landmarks, image_width, image_height):
     }
     return last_measurements
 
-# Function to overlay measurements on an image (converted to inches with 2 decimal places).
 def overlay_measurements(image, measurements):
-    # Conversion factors (pixels per inch) for each measurement—adjust as needed.
     conversion_factors = {
-        'Chest Circumference': 10.2,#32
-        'Shoulder Width': 8.4,#16-17
-        'Hip Length': 5.8,#13
-        'Thigh Circumference': 9.3,#21
+        'Chest Circumference': 10.2,
+        'Shoulder Width': 8.4,
+        'Hip Length': 5.8,
+        'Thigh Circumference': 9.3,
     }
-    
     y0 = 30
     dy = 30
     for i, (key, value) in enumerate(measurements.items()):
@@ -87,118 +74,79 @@ def overlay_measurements(image, measurements):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
     return image
 
-# Function to display the snapshot in a Tkinter window with a "Take Snapshot Again" button.
-def show_snapshot(snapshot):
-    snapshot_rgb = cv2.cvtColor(snapshot, cv2.COLOR_BGR2RGB)
-    pil_image = Image.fromarray(snapshot_rgb)
-    root = tk.Tk()
-    root.title("Snapshot")
-    tk_image = ImageTk.PhotoImage(pil_image)
-    label = tk.Label(root, image=tk_image)
-    label.pack()
-    def retake():
-        root.destroy()
-    button = tk.Button(root, text="Take Snapshot Again", command=retake, font=("Helvetica", 14))
-    button.pack(pady=10)
-    root.mainloop()
+def gen_frames():
+    global last_frame, snapshot_request
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    
+    with mp_pose.Pose(min_detection_confidence=0.5, 
+                      min_tracking_confidence=0.5) as pose:
+        while True:
+            success, frame = cap.read()
+            if not success:
+                break
 
-# Open the webcam feed, set resolution to 1080x720, and flip horizontally.
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            # Standard processing: flip, resize, convert, process with MediaPipe, and overlay measurements.
+            frame = cv2.flip(frame, 1)
+            frame = cv2.resize(frame, (1080, 720))
+            image_height, image_width, _ = frame.shape
 
-with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            print("No frame available from camera.")
-            break
+            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image_rgb.flags.writeable = False
+            results = pose.process(image_rgb)
+            image_rgb.flags.writeable = True
+            frame = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
 
-        # Flip frame horizontally for a mirror view.
-        frame = cv2.flip(frame, 1)
-        frame = cv2.resize(frame, (1080, 720))
-        display_frame = frame.copy()
-        image_height, image_width, _ = display_frame.shape
+            if results.pose_landmarks:
+                update_measurements(results.pose_landmarks.landmark, image_width, image_height)
+                mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
-        # Process frame with MediaPipe.
-        image_rgb = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
-        image_rgb.flags.writeable = False
-        results = pose.process(image_rgb)
-        image_rgb.flags.writeable = True
-        display_frame = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
+            frame = overlay_measurements(frame, last_measurements)
+            
+            # Save a clean copy (without countdown overlay) for the snapshot endpoint.
+            last_frame = frame.copy()
 
-        # Update measurements if pose landmarks are detected.
-        if results.pose_landmarks:
-            update_measurements_extended(results.pose_landmarks.landmark, image_width, image_height)
-            last_pose_landmarks = results.pose_landmarks
-            mp_drawing.draw_landmarks(display_frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-        elif last_pose_landmarks is not None:
-            mp_drawing.draw_landmarks(display_frame, last_pose_landmarks, mp_pose.POSE_CONNECTIONS)
-
-        # Overlay the computed measurements.
-        display_frame = overlay_measurements(display_frame, last_measurements)
-
-        # Overlay instructions.
-        instruction_text = "Press '3' for 3s, '5' for 5s, '0' for 10s snapshot, 'q' to quit"
-        cv2.putText(display_frame, instruction_text, (10, image_height - 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-
-        cv2.imshow('Dell Webcam WB7022 - MediaPipe Pose', display_frame)
-        key = cv2.waitKey(30) & 0xFF
-        if key == ord('q'):
-            break
-
-        # If a snapshot key is pressed, begin countdown with overlays.
-        if key in [ord('3'), ord('5'), ord('0')]:
-            countdown = 3 if key == ord('3') else 5 if key == ord('5') else 10
-            start_time = time.time()
-            while True:
-                elapsed = time.time() - start_time
-                remaining = countdown - int(elapsed)
+            # Create a copy for streaming. This copy will have the countdown overlay if a snapshot is requested.
+            frame_to_stream = frame.copy()
+            if snapshot_request["active"]:
+                elapsed = time.time() - snapshot_request["start_time"]
+                remaining = snapshot_request["duration"] - int(elapsed)
                 if remaining < 0:
                     remaining = 0
-                ret, countdown_frame = cap.read()
-                if not ret:
-                    break
-                countdown_frame = cv2.resize(countdown_frame, (1080, 720))
-                countdown_frame = cv2.flip(countdown_frame, 1)
-                # Process the frame to overlay pose and measurements during countdown.
-                img_rgb = cv2.cvtColor(countdown_frame, cv2.COLOR_BGR2RGB)
-                img_rgb.flags.writeable = False
-                countdown_results = pose.process(img_rgb)
-                img_rgb.flags.writeable = True
-                countdown_frame = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-                if countdown_results.pose_landmarks:
-                    update_measurements_extended(countdown_results.pose_landmarks.landmark, image_width, image_height)
-                    last_pose_landmarks = countdown_results.pose_landmarks
-                    mp_drawing.draw_landmarks(countdown_frame, countdown_results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-                elif last_pose_landmarks is not None:
-                    mp_drawing.draw_landmarks(countdown_frame, last_pose_landmarks, mp_pose.POSE_CONNECTIONS)
-                countdown_frame = overlay_measurements(countdown_frame, last_measurements)
-                cv2.putText(countdown_frame, f"Snapshot in: {remaining}s", (780, 100),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
-                cv2.imshow('Dell Webcam WB7022 - MediaPipe Pose', countdown_frame)
-                cv2.waitKey(30)
-                if elapsed >= countdown:
-                    break
+                countdown_text = f"Snapshot in: {remaining}s"
+                cv2.putText(frame_to_stream, countdown_text, (400, 360),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
 
-            # Capture snapshot after countdown.
-            ret, snapshot = cap.read()
-            if ret:
-                snapshot = cv2.resize(snapshot, (1080, 720))
-                snapshot = cv2.flip(snapshot, 1)
-                snapshot_rgb = cv2.cvtColor(snapshot, cv2.COLOR_BGR2RGB)
-                snapshot_rgb.flags.writeable = False
-                snapshot_results = pose.process(snapshot_rgb)
-                snapshot_rgb.flags.writeable = True
-                snapshot = cv2.cvtColor(snapshot_rgb, cv2.COLOR_RGB2BGR)
-                if snapshot_results.pose_landmarks:
-                    update_measurements_extended(snapshot_results.pose_landmarks.landmark, image_width, image_height)
-                    mp_drawing.draw_landmarks(snapshot, snapshot_results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-                elif last_pose_landmarks is not None:
-                    mp_drawing.draw_landmarks(snapshot, last_pose_landmarks, mp_pose.POSE_CONNECTIONS)
-                snapshot = overlay_measurements(snapshot, last_measurements)
-                show_snapshot(snapshot)
+            ret, buffer = cv2.imencode('.jpg', frame_to_stream)
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+    cap.release()
 
-cap.release()
-cv2.destroyAllWindows()
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/snapshot')
+def snapshot():
+    global snapshot_request, last_frame
+    duration = int(request.args.get('duration', 3))
+    snapshot_request["active"] = True
+    snapshot_request["duration"] = duration
+    snapshot_request["start_time"] = time.time()
+    time.sleep(duration)
+    snapshot_request["active"] = False
+    ret, buffer = cv2.imencode('.jpg', last_frame)
+    return Response(buffer.tobytes(), mimetype='image/jpeg')
+
+@app.route('/measurements')
+def measurements():
+    return jsonify(last_measurements)
+
+if __name__ == '__main__':
+    app.run(debug=True)
