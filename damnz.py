@@ -1,10 +1,12 @@
 from flask import Flask, render_template, Response, request, jsonify
+from flask_cors import CORS  # ✅ Import CORS
 import cv2
 import mediapipe as mp
 import math
 import time
 
 app = Flask(__name__)
+CORS(app)  # ✅ Enable CORS for all origins (or use origins=["http://localhost:5173"])
 
 # Setup MediaPipe Pose (shared settings)
 mp_drawing = mp.solutions.drawing_utils
@@ -87,7 +89,7 @@ def gen_frames():
             if not success:
                 break
 
-            # Standard processing: flip, resize, convert, process with MediaPipe, and overlay measurements.
+            # Flip, resize, convert, process with MediaPipe, and overlay measurements.
             frame = cv2.flip(frame, 1)
             frame = cv2.resize(frame, (1080, 720))
             image_height, image_width, _ = frame.shape
@@ -103,11 +105,11 @@ def gen_frames():
                 mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
             frame = overlay_measurements(frame, last_measurements)
-            
-            # Save a clean copy (without countdown overlay) for the snapshot endpoint.
+
+            # Save clean copy of frame for snapshot
             last_frame = frame.copy()
 
-            # Create a copy for streaming. This copy will have the countdown overlay if a snapshot is requested.
+            # Add countdown overlay if snapshot is active
             frame_to_stream = frame.copy()
             if snapshot_request["active"]:
                 elapsed = time.time() - snapshot_request["start_time"]
@@ -141,8 +143,13 @@ def snapshot():
     snapshot_request["start_time"] = time.time()
     time.sleep(duration)
     snapshot_request["active"] = False
-    ret, buffer = cv2.imencode('.jpg', last_frame)
-    return Response(buffer.tobytes(), mimetype='image/jpeg')
+
+    # Ensure last_frame exists
+    if last_frame is not None:
+        ret, buffer = cv2.imencode('.jpg', last_frame)
+        return Response(buffer.tobytes(), mimetype='image/jpeg')
+    else:
+        return "No frame available", 500
 
 @app.route('/measurements')
 def measurements():
