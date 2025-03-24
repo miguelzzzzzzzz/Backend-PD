@@ -3,20 +3,31 @@ import cv2
 import mediapipe as mp
 import math
 import time
-
+import base64
+import requests
 app = Flask(__name__)
 
-# Setup MediaPipe Pose (shared settings)
+# Setup MediaPipe Pose
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
-# Global variables for measurements, last clean frame, and snapshot request info.
+# Global variables
 last_measurements = {}
 last_frame = None
-snapshot_request = {
-    "active": False,
-    "duration": 0,
-    "start_time": None
+snapshot_request = {"active": False, "duration": 0, "start_time": None}
+
+
+def image_to_base64(image_path):
+    with open(image_path, "rb") as img_file:
+        encoded_string = base64.b64encode(img_file.read()).decode("utf-8")
+    return encoded_string
+
+# Global conversion factors (modifiable via the GUI)
+conversion_factors = {
+    'Chest Circumference': 7.6,
+    'Shoulder Width': 6.9,
+    'Hip Length': 4.6,
+    'Thigh Circumference': 8.6,
 }
 
 def calculate_distance(point1, point2, image_width, image_height):
@@ -55,12 +66,7 @@ def update_measurements(landmarks, image_width, image_height):
     return last_measurements
 
 def overlay_measurements(image, measurements):
-    conversion_factors = {
-        'Chest Circumference': 10.2,
-        'Shoulder Width': 8.4,
-        'Hip Length': 5.8,
-        'Thigh Circumference': 9.3,
-    }
+    global conversion_factors
     y0 = 30
     dy = 30
     for i, (key, value) in enumerate(measurements.items()):
@@ -78,7 +84,7 @@ def gen_frames():
     global last_frame, snapshot_request
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,720)
     
     with mp_pose.Pose(min_detection_confidence=0.5, 
                       min_tracking_confidence=0.5) as pose:
@@ -87,7 +93,6 @@ def gen_frames():
             if not success:
                 break
 
-            # Standard processing: flip, resize, convert, process with MediaPipe, and overlay measurements.
             frame = cv2.flip(frame, 1)
             frame = cv2.resize(frame, (1080, 720))
             image_height, image_width, _ = frame.shape
@@ -98,16 +103,13 @@ def gen_frames():
             image_rgb.flags.writeable = True
             frame = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
 
+            # Calculate measurements if landmarks are detected, but do not overlay them
             if results.pose_landmarks:
                 update_measurements(results.pose_landmarks.landmark, image_width, image_height)
-                mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+                # Skeleton drawing is omitted
 
-            frame = overlay_measurements(frame, last_measurements)
-            
-            # Save a clean copy (without countdown overlay) for the snapshot endpoint.
             last_frame = frame.copy()
 
-            # Create a copy for streaming. This copy will have the countdown overlay if a snapshot is requested.
             frame_to_stream = frame.copy()
             if snapshot_request["active"]:
                 elapsed = time.time() - snapshot_request["start_time"]
@@ -126,7 +128,8 @@ def gen_frames():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    # Pass the current conversion factors to the template
+    return render_template('index.html', conversion_factors=conversion_factors)
 
 @app.route('/video_feed')
 def video_feed():
@@ -142,11 +145,32 @@ def snapshot():
     time.sleep(duration)
     snapshot_request["active"] = False
     ret, buffer = cv2.imencode('.jpg', last_frame)
-    return Response(buffer.tobytes(), mimetype='image/jpeg')
+    jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+    cloth = image_to_base64('paldo1.jpg')
+    payload = {
+        "person_image": jpg_as_text,
+        "cloth_image": cloth,
+        "cloth_type": "upper",
+    }
+
+    response = requests.post("https://bfab-112-200-140-73.ngrok-free.app/predict", json=payload)
+    return jsonify({"image": response.json()['result_image']})
 
 @app.route('/measurements')
 def measurements():
     return jsonify(last_measurements)
+
+@app.route('/update_conversion', methods=['POST'])
+def update_conversion():
+    global conversion_factors
+    data = request.get_json()
+    key = data.get('key')
+    value = data.get('value')
+    if key in conversion_factors and isinstance(value, (int, float)):
+        conversion_factors[key] = float(value)
+        return jsonify({'status': 'success', 'conversion_factors': conversion_factors})
+    else:
+        return jsonify({'status': 'error', 'message': 'Invalid key or value'}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)

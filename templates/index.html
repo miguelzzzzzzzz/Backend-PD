@@ -6,63 +6,112 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      text-align: center;
       margin: 20px;
+      text-align: center;
     }
-    #video-container {
-      position: relative;
-      display: inline-block;
-      margin-bottom: 20px;
+    .main-container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .left-column, .center-column, .right-column {
+      margin: 10px;
+    }
+    .left-column {
+      text-align: left;
+      width: 150px;
+    }
+    .center-column {
+      text-align: center;
+    }
+    .right-column {
+      text-align: left;
+      max-width: 300px;
     }
     #videoFeed {
       border: 1px solid #ccc;
     }
+    #measurementInfo h4, #conversion-controls h4 {
+      font-size: 1em;
+      margin: 10px 0;
+    }
+    .slider-container {
+      margin: 10px 0;
+    }
+    .slider-container label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 1em;
+    }
+    /* Snapshot image remains below the live video feed */
+    #snapshotSection {
+      margin-top: 30px;
+    }
     #snapshotImg {
       border: 1px solid #ccc;
-      margin-top: 20px;
+      margin-top: 10px;
+      width:  1080px;
+      height: 720px;
     }
-    .button-container {
-      margin: 20px;
-    }
-    #measurementInfo {
-      margin-top: 20px;
-      font-size: 18px;
+    .button-container button {
+      display: block;
+      margin: 5px 0;
+      width: 100%;
     }
   </style>
 </head>
 <body>
   <h1>Live Video Feed with Snapshot</h1>
   
-  <!-- Live video feed -->
-  <div id="video-container">
-    <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Live Video Feed" width="1080" height="720">
+  <div class="main-container">
+    <!-- Left Column: Snapshot Buttons -->
+    <div class="left-column">
+      <h4>Snapshot Controls</h4>
+      <div class="button-container">
+        <button onclick="takeSnapshot(3)">3 sec</button>
+        <button onclick="takeSnapshot(5)">5 sec</button>
+        <button onclick="takeSnapshot(10)">10 sec</button>
+      </div>
+    </div>
+    
+    <!-- Center Column: Live Video Feed -->
+    <div class="center-column">
+      <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Live Video Feed" width="1080" height="720">
+    </div>
+    
+    <!-- Right Column: Measurements and Conversion Adjustments -->
+    <div class="right-column">
+      <div id="measurementInfo">
+        <h4>Measurement Sizes:</h4>
+        <div id="sizes"></div>
+        <h4>Recommended Apparel Size:</h4>
+        <div id="apparelSize"></div>
+      </div>
+      <div id="conversion-controls">
+        <h4>Adjust Conversion Factors</h4>
+        {% for key, value in conversion_factors.items() %}
+        <div class="slider-container">
+          <label for="{{ key }}">{{ key }}</label>
+          <input type="range" id="{{ key }}" name="{{ key }}" min="15" max="80" step="0.1" value="{{ value }}">
+        </div>
+        {% endfor %}
+      </div>
+    </div>
   </div>
   
-  <!-- Snapshot buttons -->
-  <div class="button-container">
-    <button onclick="takeSnapshot(3)">Snapshot 3 sec</button>
-    <button onclick="takeSnapshot(5)">Snapshot 5 sec</button>
-    <button onclick="takeSnapshot(10)">Snapshot 10 sec</button>
-  </div>
-  
-  <!-- Display snapshot -->
-  <h2>Snapshot:</h2>
-  <img id="snapshotImg" src="" alt="Snapshot will appear here" width="1080" height="720">
-  
-  <!-- Display measurement info and recommended size -->
-  <div id="measurementInfo">
-    <h3>Measurement Sizes:</h3>
-    <div id="sizes"></div>
-    <h3>Recommended Apparel Size:</h3>
-    <div id="apparelSize"></div>
+  <!-- Snapshot Image Section placed below the main container -->
+  <div id="snapshotSection">
+    <h4>Snapshot:</h4>
+    <img id="snapshotImg" src="" alt="Snapshot will appear here">
   </div>
   
   <script>
     function takeSnapshot(duration) {
       fetch(`/snapshot?duration=${duration}`)
-        .then(response => response.blob())
-        .then(blob => {
-          document.getElementById('snapshotImg').src = URL.createObjectURL(blob);
+      .then(response => response.json())
+       .then(data => {
+        const base64Image = data.image;
+          document.getElementById('snapshotImg').src = 'data:image/jpeg;base64,' + base64Image;
           // After snapshot is taken, retrieve measurement sizes from the server.
           fetch('/measurements')
             .then(response => response.json())
@@ -96,7 +145,6 @@
     }
     
     function recommendedApparelSize(chest) {
-      // Example thresholds (in inches) for recommendation:
       if (chest < 30) {
         return "Extra Small";
       } else if (chest < 34) {
@@ -109,6 +157,28 @@
         return "Extra Large";
       }
     }
+    
+    // Conversion factor slider handling
+    const sliders = document.querySelectorAll('input[type="range"]');
+    sliders.forEach(slider => {
+      slider.addEventListener('input', (event) => {
+        const key = event.target.name;
+        const newValue = parseFloat(event.target.value);
+        document.getElementById(key + '-value').innerText = newValue;
+        fetch('/update_conversion', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ key: key, value: newValue })
+        })
+        .then(response => response.json())
+        .then(data => {
+          console.log('Conversion factor updated', data);
+        })
+        .catch(error => console.error('Error updating conversion factor:', error));
+      });
+    });
   </script>
 </body>
 </html>
