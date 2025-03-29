@@ -160,7 +160,16 @@ def snapshot():
     time.sleep(duration)
     snapshot_request["active"] = False
     ret, buffer = cv2.imencode('.jpg', last_frame)
-    return Response(buffer.tobytes(), mimetype='image/jpeg')
+    jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+    cloth = image_to_base64('paldo1.jpg')
+    payload = {
+        "person_image": jpg_as_text,
+        "cloth_image": cloth,
+        "cloth_type": "upper",
+    }
+
+    response = requests.post("http://192.168.100.35:5000/predict", json=payload)
+    return jsonify({"image": response.json()['result_image']})
 
 
 @app.route('/measurements')

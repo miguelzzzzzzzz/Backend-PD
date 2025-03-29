@@ -112,21 +112,22 @@
   
   <script>
     function takeSnapshot(duration) {
-      fetch(`/measurements?duration=${duration}`)
-              .then(response => response.json())
-              .then(data => {
-                displayMeasurements(data);
-                displayMeasurementsEn(data);
-                displayMeasurementsEu(data);
-  
-              })
-              .catch(error => console.error('Error fetching measurements:', error));
-      fetch(`/snapshot?duration=${duration}`)
-        .then(response => response.blob())
-        .then(blob => {
-          document.getElementById('snapshotImg').src = URL.createObjectURL(blob);
-          // After snapshot is taken, retrieve measurement sizes from the server.
+      fetch('/measurements')
+            .then(response => response.json())
+            .then(data => {
+              displayMeasurements(data);
+              displayMeasurementsEn(data);
+              displayMeasurementsEu(data);
 
+            })
+            .catch(error => console.error('Error fetching measurements:', error));
+      fetch(`/snapshot?duration=${duration}`)
+      .then(response => response.json())
+       .then(data => {
+        const base64Image = data.image;
+          document.getElementById('snapshotImg').src = 'data:image/jpeg;base64,' + base64Image;
+          // After snapshot is taken, retrieve measurement sizes from the server.
+          
         })
         .catch(error => console.error('Error taking snapshot:', error));
     }
