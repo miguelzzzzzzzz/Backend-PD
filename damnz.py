@@ -80,11 +80,26 @@ def overlay_measurements(image, measurements):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
     return image
 
+def overlay_measurements(image, measurements):
+    global conversion_factors
+    y0 = 30
+    dy = 30
+    for i, (key, value) in enumerate(measurements.items()):
+        if value is not None:
+            conversion = conversion_factors.get(key, 1)
+            inches = value / conversion
+            display_value = f"{inches:.2f} inch"
+        else:
+            display_value = "N/A"
+        cv2.putText(image, f"{key}: {display_value}", (10, y0 + i * dy),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    return image
+
 def gen_frames():
     global last_frame, snapshot_request
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,720)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     
     with mp_pose.Pose(min_detection_confidence=0.5, 
                       min_tracking_confidence=0.5) as pose:
@@ -103,11 +118,12 @@ def gen_frames():
             image_rgb.flags.writeable = True
             frame = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
 
-            # Calculate measurements if landmarks are detected, but do not overlay them
+            # Update measurements if landmarks are detected
             if results.pose_landmarks:
                 update_measurements(results.pose_landmarks.landmark, image_width, image_height)
-                # Skeleton drawing is omitted
+                mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
+            frame = overlay_measurements(frame, last_measurements)
             last_frame = frame.copy()
 
             frame_to_stream = frame.copy()
@@ -125,7 +141,6 @@ def gen_frames():
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
     cap.release()
-
 @app.route('/')
 def index():
     # Pass the current conversion factors to the template
@@ -145,19 +160,13 @@ def snapshot():
     time.sleep(duration)
     snapshot_request["active"] = False
     ret, buffer = cv2.imencode('.jpg', last_frame)
-    jpg_as_text = base64.b64encode(buffer).decode('utf-8')
-    cloth = image_to_base64('paldo1.jpg')
-    payload = {
-        "person_image": jpg_as_text,
-        "cloth_image": cloth,
-        "cloth_type": "upper",
-    }
+    return Response(buffer.tobytes(), mimetype='image/jpeg')
 
-    response = requests.post("https://bfab-112-200-140-73.ngrok-free.app/predict", json=payload)
-    return jsonify({"image": response.json()['result_image']})
 
 @app.route('/measurements')
 def measurements():
+    duration = int(request.args.get('duration', 3))
+    time.sleep(duration)
     return jsonify(last_measurements)
 
 @app.route('/update_conversion', methods=['POST'])
