@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Live Feed with Snapshot, Clothing Selection & Toggle</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>z
+</head>
 <body>
   <div class="app-container">
     <h1 class="title">Live Video Feed with Snapshot, Clothing Selection & Toggle</h1>
@@ -24,9 +24,14 @@
         </div>
         
         <div class="preview-container">
-          <!-- Live Feed Container -->
+          <!-- Live Feed Container (always streaming) -->
           <div id="liveFeedContainer">
             <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Live Video Feed" class="webcam-preview">
+          </div>
+          <!-- Snapshot Overlay (hidden by default) -->
+          <div id="snapshotOverlay" style="display: none;">
+            <img id="snapshotPreview" src="" alt="Snapshot Preview" class="image-preview">
+            <button class="button retry-button" onclick="retrySnapshot()">Retry Snapshot</button>
           </div>
           <!-- Upload Image Container (hidden by default) -->
           <div id="uploadContainer" style="display: none;">
@@ -82,10 +87,29 @@
       </div>
     </div>
     
-    <!-- Snapshot Image Section placed below the main container -->
-    <div id="snapshotSection">
+    <!-- Optional Snapshot Section if needed -->
+    <div id="snapshotSection" style="display: none;">
       <h4>Snapshot:</h4>
       <img id="snapshotImg" src="" alt="Snapshot will appear here" class="image-preview">
+    </div>
+  </div>
+
+  <!-- Processing Modal (hidden by default) -->
+  <div id="processingModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h3 id="modalHeader">Generating...</h3>
+      <div class="spinner"></div>
+      <div class="progress-container">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+      <div id="processedImageContainer" style="display: none;">
+        <h4>Result:</h4>
+        <img id="processedImage" src="" alt="Processed Image" class="processed-image">
+      </div>
+      <div id="modalButtons" style="display: none; margin-top: 20px;">
+        <button class="button" onclick="saveImage()">Save</button>
+        <button class="button" onclick="closeModal()">Close</button>
+      </div>
     </div>
   </div>
   

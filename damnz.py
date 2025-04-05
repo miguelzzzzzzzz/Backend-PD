@@ -106,7 +106,7 @@ def gen_frames():
             # Update measurements if landmarks are detected
             if results.pose_landmarks:
                 update_measurements(results.pose_landmarks.landmark, image_width, image_height)
-                mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+                #mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
             frame = overlay_measurements(frame, last_measurements)
             last_frame = frame.copy()
@@ -135,8 +135,12 @@ def index():
 def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@app.route('/snapshot')
-def snapshot():
+@app.route('/capture')
+def capture():
+    """
+    Captures the current frame after waiting for the specified duration and returns it as a base64 image.
+    No processing is done here.
+    """
     global snapshot_request, last_frame
     duration = int(request.args.get('duration', 3))
     snapshot_request["active"] = True
@@ -146,14 +150,31 @@ def snapshot():
     snapshot_request["active"] = False
     ret, buffer = cv2.imencode('.jpg', last_frame)
     jpg_as_text = base64.b64encode(buffer).decode('utf-8')
-    cloth = image_to_base64('paldo1.jpg')
+    return jsonify({"image": jpg_as_text})
+
+@app.route('/process_snapshot', methods=['POST'])
+def process_snapshot(): 
+    data = request.get_json()
+    image_base64 = data.get("image")
+    cloth_type = data.get("cloth_type", "upper")
+    selected_cloth = data.get("selected_cloth")
+
+    # Use the provided cloth image or fall back to a default image.
+    if not selected_cloth:
+        cloth_image = image_to_base64('paldo1.jpg')
+    else:
+        cloth_image = selected_cloth
+
     payload = {
-        "person_image": jpg_as_text,
-        "cloth_image": cloth,
-        "cloth_type": "upper",
+        "person_image": image_base64,
+        "cloth_image": cloth_image,
+        "cloth_type": cloth_type,
     }
-    response = requests.post("http://192.168.100.35:5000/predict", json=payload)
-    return jsonify({"image": response.json()['result_image']})
+
+    response = requests.post("https://3e14-35-240-133-75.ngrok-free.app/tryon", json=payload)
+    result_image = response.json().get('result_image')
+    return jsonify({"image": result_image})
+
 
 @app.route('/measurements')
 def measurements():
@@ -193,7 +214,7 @@ def calibrate():
         'Hip Length': 38,
         'Thigh Circumference': 22,
     }
-    tolerance = 1.0  # 1 inch tolerance
+    tolerance = 1.0
     updated_factors = {}
 
     if not last_measurements:
