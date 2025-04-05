@@ -5,6 +5,7 @@ import math
 import time
 import base64
 import requests
+
 app = Flask(__name__)
 
 # Setup MediaPipe Pose
@@ -16,13 +17,12 @@ last_measurements = {}
 last_frame = None
 snapshot_request = {"active": False, "duration": 0, "start_time": None}
 
-
 def image_to_base64(image_path):
     with open(image_path, "rb") as img_file:
         encoded_string = base64.b64encode(img_file.read()).decode("utf-8")
     return encoded_string
 
-# Global conversion factors (modifiable via the GUI)
+# Global conversion factors (modifiable via the GUI or calibration)
 conversion_factors = {
     'Chest Circumference': 7.6,
     'Shoulder Width': 6.9,
@@ -64,21 +64,6 @@ def update_measurements(landmarks, image_width, image_height):
         'Thigh Circumference': int(thigh_circumference),
     }
     return last_measurements
-
-def overlay_measurements(image, measurements):
-    global conversion_factors
-    y0 = 30
-    dy = 30
-    for i, (key, value) in enumerate(measurements.items()):
-        if value is not None:
-            conversion = conversion_factors.get(key, 1)
-            inches = value / conversion
-            display_value = f"{inches:.2f} inch"
-        else:
-            display_value = "N/A"
-        cv2.putText(image, f"{key}: {display_value}", (10, y0 + i * dy),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-    return image
 
 def overlay_measurements(image, measurements):
     global conversion_factors
@@ -141,9 +126,9 @@ def gen_frames():
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
     cap.release()
+
 @app.route('/')
 def index():
-    # Pass the current conversion factors to the template
     return render_template('index.html', conversion_factors=conversion_factors)
 
 @app.route('/video_feed')
@@ -167,10 +152,8 @@ def snapshot():
         "cloth_image": cloth,
         "cloth_type": "upper",
     }
-
     response = requests.post("http://192.168.100.35:5000/predict", json=payload)
     return jsonify({"image": response.json()['result_image']})
-
 
 @app.route('/measurements')
 def measurements():
@@ -189,6 +172,45 @@ def update_conversion():
         return jsonify({'status': 'success', 'conversion_factors': conversion_factors})
     else:
         return jsonify({'status': 'error', 'message': 'Invalid key or value'}), 400
+
+# New calibration endpoint using fixed sizes on the backend
+@app.route('/calibrate', methods=['POST'])
+def calibrate():
+    """
+    This endpoint uses fixed calibration sizes stored on the backend.
+    Fixed sizes (in inches) for the calibration subject:
+      - Chest Circumference: 36
+      - Shoulder Width: 16
+      - Hip Length: 38
+      - Thigh Circumference: 22
+    It compares the current measurements against these values and updates the conversion factors if
+    the difference is greater than a 1 inch tolerance.
+    """
+    global conversion_factors, last_measurements
+    fixed_sizes = {
+        'Chest Circumference': 36,
+        'Shoulder Width': 16,
+        'Hip Length': 38,
+        'Thigh Circumference': 22,
+    }
+    tolerance = 1.0  # 1 inch tolerance
+    updated_factors = {}
+
+    if not last_measurements:
+        return jsonify({'status': 'error', 'message': 'No measurements available for calibration.'}), 400
+
+    for key, fixed_size in fixed_sizes.items():
+        if key in last_measurements:
+            measured_pixels = last_measurements[key]
+            current_factor = conversion_factors.get(key, 1)
+            measured_inch = measured_pixels / current_factor
+            diff = abs(measured_inch - fixed_size)
+            if diff > tolerance:
+                new_factor = measured_pixels / fixed_size
+                conversion_factors[key] = new_factor
+                updated_factors[key] = new_factor
+
+    return jsonify({'status': 'calibrated', 'updated_factors': updated_factors})
 
 if __name__ == '__main__':
     app.run(debug=True)
