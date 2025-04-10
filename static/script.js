@@ -63,6 +63,7 @@ function retrySnapshot() {
   document.getElementById('liveFeedContainer').style.display = 'block';
   capturedSnapshot = null;
 }
+
 function handleSubmit() {
   let personImagePromise;
   // Determine which mode is active: live feed (capturedSnapshot) or upload mode.
@@ -147,7 +148,6 @@ function handleSubmit() {
   });
 }
 
-
 // Helper function to convert URL to base64 (unchanged)
 function convertURLToBase64(url) {
   return fetch(url)
@@ -196,81 +196,81 @@ function calibrate() {
 
 function displayMeasurements(data) {
   const sizesDiv = document.getElementById('sizes');
-  let chestInches = (data['Chest Circumference']).toFixed(2);
-  let shoulderInches = (data['Shoulder Width']).toFixed(2);
-  let hipInches = (data['Hip Length']).toFixed(2);
-  let thighInches = (data['Thigh Circumference']).toFixed(2);
+  let chestCm = (data['Chest Circumference']).toFixed(2);
+  let shoulderCm = (data['Shoulder Width']).toFixed(2);
+  let hipCm = (data['Hip Length']).toFixed(2);
+  let thighCm = (data['Thigh Circumference']).toFixed(2);
   
   sizesDiv.innerHTML = `
-    Chest Circumference: ${chestInches} inch<br>
-    Shoulder Width: ${shoulderInches} inch<br>
-    Hip Length: ${hipInches} inch<br>
-    Thigh Circumference: ${thighInches} inch
+    Chest Circumference: ${chestCm} cm<br>
+    Shoulder Width: ${shoulderCm} cm<br>
+    Hip Length: ${hipCm} cm<br>
+    Thigh Circumference: ${thighCm} cm
   `;
   
   let recommended = recommendedOverallSize(
-    parseFloat(chestInches),
-    parseFloat(shoulderInches),
-    parseFloat(hipInches),
-    parseFloat(thighInches)
+    parseFloat(chestCm),
+    parseFloat(shoulderCm),
+    parseFloat(hipCm),
+    parseFloat(thighCm)
   );
   document.getElementById('apparelSize').innerText = recommended;
 }
 
 function displayMeasurementsEast(data) {
-  let chestInches = (data['Chest Circumference']).toFixed(2);
-  let shoulderInches = (data['Shoulder Width']).toFixed(2);
-  let hipInches = (data['Hip Length']).toFixed(2);
-  let thighInches = (data['Thigh Circumference']).toFixed(2);
+  let chestCm = (data['Chest Circumference'] * 2.54).toFixed(2);
+  let shoulderCm = (data['Shoulder Width'] * 2.54).toFixed(2);
+  let hipCm = (data['Hip Length'] * 2.54).toFixed(2);
+  let thighCm = (data['Thigh Circumference'] * 2.54).toFixed(2);
   
   let recommended = recommendedOverallSizeEast(
-    parseFloat(chestInches),
-    parseFloat(shoulderInches),
-    parseFloat(hipInches),
-    parseFloat(thighInches)
+    parseFloat(chestCm),
+    parseFloat(shoulderCm),
+    parseFloat(hipCm),
+    parseFloat(thighCm)
   );
   document.getElementById('apparelSizeEu').innerText = recommended;
 }
 
 function displayMeasurementsWest(data) {
-  let chestInches = (data['Chest Circumference']).toFixed(2);
-  let shoulderInches = (data['Shoulder Width']).toFixed(2);
-  let hipInches = (data['Hip Length']).toFixed(2);
-  let thighInches = (data['Thigh Circumference']).toFixed(2);
+  let chestCm = (data['Chest Circumference'] * 2.54).toFixed(2);
+  let shoulderCm = (data['Shoulder Width'] * 2.54).toFixed(2);
+  let hipCm = (data['Hip Length'] * 2.54).toFixed(2);
+  let thighCm = (data['Thigh Circumference'] * 2.54).toFixed(2);
   
   let recommended = recommendedOverallSizeWest(
-    parseFloat(chestInches),
-    parseFloat(shoulderInches),
-    parseFloat(hipInches),
-    parseFloat(thighInches)
+    parseFloat(chestCm),
+    parseFloat(shoulderCm),
+    parseFloat(hipCm),
+    parseFloat(thighCm)
   );
   document.getElementById('apparelSizeEn').innerText = recommended;
 }
 
 function recommendedOverallSize(chest, shoulder, hip, thigh) {
   const sizeMapping = { "XS": 0, "S": 1, "M": 2, "L": 3, "XL": 4, "XXL": 5 };
-  function recommendedSizeFromChest(chestInches) {
-    if (chestInches < 17.9) return "XS";
-    else if (chestInches < 19.1) return "S";
-    else if (chestInches < 20.3) return "M";
-    else if (chestInches < 21.45) return "L";
-    else if (chestInches < 22.6) return "XL";
+  function recommendedSizeFromChest(chestCm) {
+    if (chestCm < 45.5) return "XS";       // 17.9 inches -> 45.5 cm
+    else if (chestCm < 48.5) return "S";   // 19.1 inches -> 48.5 cm
+    else if (chestCm < 51.5) return "M";   // 20.3 inches -> 51.5 cm
+    else if (chestCm < 54.5) return "L";   // 21.45 inches -> 54.5 cm
+    else if (chestCm < 57.5) return "XL";  // 22.6 inches -> 57.5 cm
     else return "XXL";
   }
-  function recommendedSizeFromShoulder(shoulderInches) {
-    if (shoulderInches < 16.1) return "XS";
-    else if (shoulderInches < 16.9) return "S";
-    else if (shoulderInches < 17.7) return "M";
-    else if (shoulderInches < 18.5) return "L";
-    else if (shoulderInches < 19.3) return "XL";
+  function recommendedSizeFromShoulder(shoulderCm) {
+    if (shoulderCm < 41) return "XS";      // 16.1 inches -> 41 cm
+    else if (shoulderCm < 43) return "S";  // 16.9 inches -> 43 cm
+    else if (shoulderCm < 45) return "M";  // 17.7 inches -> 45 cm
+    else if (shoulderCm < 47) return "L";  // 18.5 inches -> 47 cm
+    else if (shoulderCm < 49) return "XL"; // 19.3 inches -> 49 cm
     else return "XXL";
   }
-  function recommendedSizeFromLength(lengthInches) {
-    if (lengthInches < 25.4) return "XS";
-    else if (lengthInches < 26.6) return "S";
-    else if (lengthInches < 27.75) return "M";
-    else if (lengthInches < 28.7) return "L";
-    else if (lengthInches < 29.5) return "XL";
+  function recommendedSizeFromLength(lengthCm) {
+    if (lengthCm < 64.5) return "XS";      // 25.4 inches -> 64.5 cm
+    else if (lengthCm < 67.5) return "S";  // 26.6 inches -> 67.5 cm
+    else if (lengthCm < 70.5) return "M";  // 27.75 inches -> 70.5 cm
+    else if (lengthCm < 73) return "L";    // 28.7 inches -> 73 cm
+    else if (lengthCm < 75) return "XL";   // 29.5 inches -> 75 cm
     else return "XXL";
   }
   const chestSize = recommendedSizeFromChest(chest / 2);
@@ -285,35 +285,34 @@ function recommendedOverallSize(chest, shoulder, hip, thigh) {
 function recommendedOverallSizeEast(chest, shoulder, hip, thigh) {
   const sizeMapping = { "XS": 0, "S": 1, "M": 2, "L": 3, "XL": 4, "XXL": 5 };
 
-  function recommendedSizeFromChest(chestInches) {
-    // Retaining researched upper thresholds for Eastern sizing:
-    if (chestInches < 17.15) return "XS";
-    else if (chestInches < 17.9) return "S";
-    else if (chestInches < 18.7) return "M";
-    else if (chestInches < 19.5) return "L";
-    else if (chestInches < 20.3) return "XL";
+  function recommendedSizeFromChest(chestCm) {
+    // Converted from inches to cm
+    if (chestCm < 43.5) return "XS";      // 17.15 inches -> 43.5 cm
+    else if (chestCm < 45.5) return "S";  // 17.9 inches -> 45.5 cm
+    else if (chestCm < 47.5) return "M";  // 18.7 inches -> 47.5 cm
+    else if (chestCm < 49.5) return "L";  // 19.5 inches -> 49.5 cm
+    else if (chestCm < 51.5) return "XL"; // 20.3 inches -> 51.5 cm
     else return "XXL";
   }
 
-  function recommendedSizeFromShoulder(shoulderInches) {
-    if (shoulderInches < 16.1) return "XS";
-    else if (shoulderInches < 16.9) return "S";
-    else if (shoulderInches < 17.7) return "M";
-    else if (shoulderInches < 18.5) return "L";
-    else if (shoulderInches < 19.3) return "XL";
+  function recommendedSizeFromShoulder(shoulderCm) {
+    if (shoulderCm < 41) return "XS";      // 16.1 inches -> 41 cm
+    else if (shoulderCm < 43) return "S";  // 16.9 inches -> 43 cm
+    else if (shoulderCm < 45) return "M";  // 17.7 inches -> 45 cm
+    else if (shoulderCm < 47) return "L";  // 18.5 inches -> 47 cm
+    else if (shoulderCm < 49) return "XL"; // 19.3 inches -> 49 cm
     else return "XXL";
   }
 
-  function recommendedSizeFromLength(lengthInches) {
-    if (lengthInches < 25.4) return "XS";
-    else if (lengthInches < 26.6) return "S";
-    else if (lengthInches < 27.75) return "M";
-    else if (lengthInches < 28.7) return "L";
-    else if (lengthInches < 29.5) return "XL";
+  function recommendedSizeFromLength(lengthCm) {
+    if (lengthCm < 64.5) return "XS";      // 25.4 inches -> 64.5 cm
+    else if (lengthCm < 67.5) return "S";  // 26.6 inches -> 67.5 cm
+    else if (lengthCm < 70.5) return "M";  // 27.75 inches -> 70.5 cm
+    else if (lengthCm < 73) return "L";    // 28.7 inches -> 73 cm
+    else if (lengthCm < 75) return "XL";   // 29.5 inches -> 75 cm
     else return "XXL";
   }
 
-  // Note: as in your original code, the chest measurement is halved.
   const chestSize = recommendedSizeFromChest(chest / 2);
   const shoulderSize = recommendedSizeFromShoulder(shoulder);
   const lengthSize = recommendedSizeFromLength(hip);
@@ -323,41 +322,38 @@ function recommendedOverallSizeEast(chest, shoulder, hip, thigh) {
   const maxSizeValue = Math.max(...numericSizes);
   return Object.keys(sizeMapping).find(key => sizeMapping[key] === maxSizeValue);
 }
-
-
 
 function recommendedOverallSizeWest(chest, shoulder, hip, thigh) {
   const sizeMapping = { "XS": 0, "S": 1, "M": 2, "L": 3, "XL": 4, "XXL": 5 };
 
-  function recommendedSizeFromChest(chestInches) {
-    // Retaining researched upper thresholds for Western sizing:
-    if (chestInches < 16.95) return "XS";
-    else if (chestInches < 17.9) return "S";
-    else if (chestInches < 18.9) return "M";
-    else if (chestInches < 19.9) return "L";
-    else if (chestInches < 21.05) return "XL";
+  function recommendedSizeFromChest(chestCm) {
+    // Converted from inches to cm
+    if (chestCm < 43) return "XS";        // 16.95 inches -> 43 cm
+    else if (chestCm < 45.5) return "S";  // 17.9 inches -> 45.5 cm
+    else if (chestCm < 48) return "M";    // 18.9 inches -> 48 cm
+    else if (chestCm < 50.5) return "L";  // 19.9 inches -> 50.5 cm
+    else if (chestCm < 53.5) return "XL"; // 21.05 inches -> 53.5 cm
     else return "XXL";
   }
 
-  function recommendedSizeFromShoulder(shoulderInches) {
-    if (shoulderInches < 16.1) return "XS";
-    else if (shoulderInches < 16.9) return "S";
-    else if (shoulderInches < 17.7) return "M";
-    else if (shoulderInches < 18.5) return "L";
-    else if (shoulderInches < 19.3) return "XL";
+  function recommendedSizeFromShoulder(shoulderCm) {
+    if (shoulderCm < 41) return "XS";      // 16.1 inches -> 41 cm
+    else if (shoulderCm < 43) return "S";  // 16.9 inches -> 43 cm
+    else if (shoulderCm < 45) return "M";  // 17.7 inches -> 45 cm
+    else if (shoulderCm < 47) return "L";  // 18.5 inches -> 47 cm
+    else if (shoulderCm < 49) return "XL"; // 19.3 inches -> 49 cm
     else return "XXL";
   }
 
-  function recommendedSizeFromLength(lengthInches) {
-    if (lengthInches < 25.4) return "XS";
-    else if (lengthInches < 26.6) return "S";
-    else if (lengthInches < 27.75) return "M";
-    else if (lengthInches < 28.7) return "L";
-    else if (lengthInches < 29.5) return "XL";
+  function recommendedSizeFromLength(lengthCm) {
+    if (lengthCm < 64.5) return "XS";      // 25.4 inches -> 64.5 cm
+    else if (lengthCm < 67.5) return "S";  // 26.6 inches -> 67.5 cm
+    else if (lengthCm < 70.5) return "M";  // 27.75 inches -> 70.5 cm
+    else if (lengthCm < 73) return "L";    // 28.7 inches -> 73 cm
+    else if (lengthCm < 75) return "XL";   // 29.5 inches -> 75 cm
     else return "XXL";
   }
 
-  // As before, we use chest / 2.
   const chestSize = recommendedSizeFromChest(chest / 2);
   const shoulderSize = recommendedSizeFromShoulder(shoulder);
   const lengthSize = recommendedSizeFromLength(hip);
@@ -367,8 +363,6 @@ function recommendedOverallSizeWest(chest, shoulder, hip, thigh) {
   const maxSizeValue = Math.max(...numericSizes);
   return Object.keys(sizeMapping).find(key => sizeMapping[key] === maxSizeValue);
 }
-
-
 
 // --- Clothing Selection Functionality ---
 let selectedCloth = null;

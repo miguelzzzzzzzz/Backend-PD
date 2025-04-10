@@ -161,11 +161,14 @@ input:checked + .slider:before {
 .webcam-preview,
 .image-preview {
   width: 100%;
-  max-height: 600px;
+  max-height: 800px;
+  max-width: 500px;
   object-fit: contain;
   border-radius: 8px;
   border: 1px solid #ccc;
   margin-top: 10px;
+  margin: 10px auto; /* Centers the preview */
+  display: block; /* Ensures proper centering */
 }
 
 /* Upload Box Styles */

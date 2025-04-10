@@ -24,10 +24,10 @@ def image_to_base64(image_path):
 
 # Global conversion factors (modifiable via the GUI or calibration)
 conversion_factors = {
-    'Chest Circumference': 7.6,
-    'Shoulder Width': 6.9,
-    'Hip Length': 4.6,
-    'Thigh Circumference': 8.6,
+    'Chest Circumference': 7.6 * 2.54,  # Converted to cm
+    'Shoulder Width': 6.9 * 2.54,       # Converted to cm
+    'Hip Length': 4.6 * 2.54,           # Converted to cm
+    'Thigh Circumference': 8.6 * 2.54,  # Converted to cm
 }
 
 def calculate_distance(point1, point2, image_width, image_height):
@@ -72,8 +72,8 @@ def overlay_measurements(image, measurements):
     for i, (key, value) in enumerate(measurements.items()):
         if value is not None:
             conversion = conversion_factors.get(key, 1)
-            inches = value / conversion
-            display_value = f"{inches:.2f} inch"
+            centimeters = value / conversion
+            display_value = f"{centimeters:.2f} cm"
         else:
             display_value = "N/A"
         cv2.putText(image, f"{key}: {display_value}", (10, y0 + i * dy),
@@ -83,8 +83,9 @@ def overlay_measurements(image, measurements):
 def gen_frames():
     global last_frame, snapshot_request
     cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    # Set portrait resolution (720x1080 instead of 1080x720)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 720)   # Height becomes width
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)  # Width becomes height
     
     with mp_pose.Pose(min_detection_confidence=0.5, 
                       min_tracking_confidence=0.5) as pose:
@@ -93,8 +94,12 @@ def gen_frames():
             if not success:
                 break
 
-            frame = cv2.flip(frame, 1)
-            frame = cv2.resize(frame, (1080, 720))
+            # Rotate the frame 90 degrees clockwise for proper portrait orientation
+            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+            frame = cv2.flip(frame, 1)  # Mirror effect
+            
+            # Resize to maintain portrait aspect (optional)
+            frame = cv2.resize(frame, (720, 1080))
             image_height, image_width, _ = frame.shape
 
             image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -117,8 +122,9 @@ def gen_frames():
                 remaining = snapshot_request["duration"] - int(elapsed)
                 if remaining < 0:
                     remaining = 0
+                # Adjust text position for portrait mode
                 countdown_text = f"Snapshot in: {remaining}s"
-                cv2.putText(frame_to_stream, countdown_text, (400, 360),
+                cv2.putText(frame_to_stream, countdown_text, (200, 540),  # Adjusted coordinates
                             cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
 
             ret, buffer = cv2.imencode('.jpg', frame_to_stream)
@@ -182,13 +188,13 @@ def measurements():
     duration = int(request.args.get('duration', 3))
     time.sleep(duration)
     
-    # Convert raw measurements to inches using conversion_factors
+    # Convert raw measurements to centimeters using conversion_factors
     converted_measurements = {}
     for key, value in last_measurements.items():
         conversion = conversion_factors.get(key, 1)
         if value is not None:
-            inches = value / conversion
-            converted_measurements[key] = round(inches, 2)
+            centimeters = value / conversion
+            converted_measurements[key] = round(centimeters, 2)
         else:
             converted_measurements[key] = None
 
@@ -202,7 +208,7 @@ def update_conversion():
     key = data.get('key')
     value = data.get('value')
     if key in conversion_factors and isinstance(value, (int, float)):
-        conversion_factors[key] = float(value)
+        conversion_factors[key] = float(value) * 2.54  # Convert input to cm
         return jsonify({'status': 'success', 'conversion_factors': conversion_factors})
     else:
         return jsonify({'status': 'error', 'message': 'Invalid key or value'}), 400
@@ -212,22 +218,22 @@ def update_conversion():
 def calibrate():
     """
     This endpoint uses fixed calibration sizes stored on the backend.
-    Fixed sizes (in inches) for the calibration subject:
-      - Chest Circumference: 36
-      - Shoulder Width: 16
-      - Hip Length: 38
-      - Thigh Circumference: 22
+    Fixed sizes (in cm) for the calibration subject:
+      - Chest Circumference: 91.44 cm (36 inches)
+      - Shoulder Width: 40.64 cm (16 inches)
+      - Hip Length: 96.52 cm (38 inches)
+      - Thigh Circumference: 55.88 cm (22 inches)
     It compares the current measurements against these values and updates the conversion factors if
-    the difference is greater than a 1 inch tolerance.
+    the difference is greater than a 2.54 cm (1 inch) tolerance.
     """
     global conversion_factors, last_measurements
     fixed_sizes = {
-        'Chest Circumference': 38,
-        'Shoulder Width': 16,
-        'Hip Length': 15,
-        'Thigh Circumference': 20,
+        'Chest Circumference': 96.52,  # 38 inches in cm
+        'Shoulder Width': 40.64,       # 16 inches in cm
+        'Hip Length': 38.1,            # 15 inches in cm
+        'Thigh Circumference': 50.8,   # 20 inches in cm
     }
-    tolerance = 1.0
+    tolerance = 2.54  # 1 inch in cm
     updated_factors = {}
 
     if not last_measurements:
@@ -237,8 +243,8 @@ def calibrate():
         if key in last_measurements:
             measured_pixels = last_measurements[key]
             current_factor = conversion_factors.get(key, 1)
-            measured_inch = measured_pixels / current_factor
-            diff = abs(measured_inch - fixed_size)
+            measured_cm = measured_pixels / current_factor
+            diff = abs(measured_cm - fixed_size)
             if diff > tolerance:
                 new_factor = measured_pixels / fixed_size
                 conversion_factors[key] = new_factor
