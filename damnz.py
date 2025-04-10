@@ -37,9 +37,9 @@ def calculate_distance(point1, point2, image_width, image_height):
 
 def update_measurements(landmarks, image_width, image_height):
     global last_measurements
-    chest_factor = 2.5
-    hip_factor   = 2.7
-    thigh_factor = 2.5
+    chest_factor = 2.6
+    hip_factor   = 2.8
+    thigh_factor = 2.6
 
     chest_width = calculate_distance(
         landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value],
@@ -106,7 +106,7 @@ def gen_frames():
             # Update measurements if landmarks are detected
             if results.pose_landmarks:
                 update_measurements(results.pose_landmarks.landmark, image_width, image_height)
-                #mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+                mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
             frame = overlay_measurements(frame, last_measurements)
             last_frame = frame.copy()
@@ -150,6 +150,7 @@ def capture():
     snapshot_request["active"] = False
     ret, buffer = cv2.imencode('.jpg', last_frame)
     jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+    cv2.imwrite("last_frame.jpg", last_frame)
     return jsonify({"image": jpg_as_text})
 
 @app.route('/process_snapshot', methods=['POST'])
@@ -171,7 +172,7 @@ def process_snapshot():
         "cloth_type": cloth_type,
     }
 
-    response = requests.post("https://3e14-35-240-133-75.ngrok-free.app/tryon", json=payload)
+    response = requests.post("https://99ab-34-125-202-23.ngrok-free.app//tryon", json=payload)
     result_image = response.json().get('result_image')
     return jsonify({"image": result_image})
 
@@ -180,7 +181,19 @@ def process_snapshot():
 def measurements():
     duration = int(request.args.get('duration', 3))
     time.sleep(duration)
-    return jsonify(last_measurements)
+    
+    # Convert raw measurements to inches using conversion_factors
+    converted_measurements = {}
+    for key, value in last_measurements.items():
+        conversion = conversion_factors.get(key, 1)
+        if value is not None:
+            inches = value / conversion
+            converted_measurements[key] = round(inches, 2)
+        else:
+            converted_measurements[key] = None
+
+    return jsonify(converted_measurements)
+
 
 @app.route('/update_conversion', methods=['POST'])
 def update_conversion():
@@ -209,10 +222,10 @@ def calibrate():
     """
     global conversion_factors, last_measurements
     fixed_sizes = {
-        'Chest Circumference': 36,
+        'Chest Circumference': 38,
         'Shoulder Width': 16,
-        'Hip Length': 38,
-        'Thigh Circumference': 22,
+        'Hip Length': 15,
+        'Thigh Circumference': 20,
     }
     tolerance = 1.0
     updated_factors = {}

@@ -196,10 +196,10 @@ function calibrate() {
 
 function displayMeasurements(data) {
   const sizesDiv = document.getElementById('sizes');
-  let chestInches = (data['Chest Circumference'] / 7.6).toFixed(2);
-  let shoulderInches = (data['Shoulder Width'] / 6.9).toFixed(2);
-  let hipInches = (data['Hip Length'] / 4.6).toFixed(2);
-  let thighInches = (data['Thigh Circumference'] / 8.6).toFixed(2);
+  let chestInches = (data['Chest Circumference']).toFixed(2);
+  let shoulderInches = (data['Shoulder Width']).toFixed(2);
+  let hipInches = (data['Hip Length']).toFixed(2);
+  let thighInches = (data['Thigh Circumference']).toFixed(2);
   
   sizesDiv.innerHTML = `
     Chest Circumference: ${chestInches} inch<br>
@@ -218,10 +218,10 @@ function displayMeasurements(data) {
 }
 
 function displayMeasurementsEast(data) {
-  let chestInches = (data['Chest Circumference'] / 7.6).toFixed(2);
-  let shoulderInches = (data['Shoulder Width'] / 6.9).toFixed(2);
-  let hipInches = (data['Hip Length'] / 4.6).toFixed(2);
-  let thighInches = (data['Thigh Circumference'] / 8.6).toFixed(2);
+  let chestInches = (data['Chest Circumference']).toFixed(2);
+  let shoulderInches = (data['Shoulder Width']).toFixed(2);
+  let hipInches = (data['Hip Length']).toFixed(2);
+  let thighInches = (data['Thigh Circumference']).toFixed(2);
   
   let recommended = recommendedOverallSizeEast(
     parseFloat(chestInches),
@@ -233,10 +233,10 @@ function displayMeasurementsEast(data) {
 }
 
 function displayMeasurementsWest(data) {
-  let chestInches = (data['Chest Circumference'] / 7.6).toFixed(2);
-  let shoulderInches = (data['Shoulder Width'] / 6.9).toFixed(2);
-  let hipInches = (data['Hip Length'] / 4.6).toFixed(2);
-  let thighInches = (data['Thigh Circumference'] / 8.6).toFixed(2);
+  let chestInches = (data['Chest Circumference']).toFixed(2);
+  let shoulderInches = (data['Shoulder Width']).toFixed(2);
+  let hipInches = (data['Hip Length']).toFixed(2);
+  let thighInches = (data['Thigh Circumference']).toFixed(2);
   
   let recommended = recommendedOverallSizeWest(
     parseFloat(chestInches),
@@ -284,15 +284,17 @@ function recommendedOverallSize(chest, shoulder, hip, thigh) {
 
 function recommendedOverallSizeEast(chest, shoulder, hip, thigh) {
   const sizeMapping = { "XS": 0, "S": 1, "M": 2, "L": 3, "XL": 4, "XXL": 5 };
-  function recommendedSizeFromChest(chestWidthInches) {
-    if (chestWidthInches >= 15.95 && chestWidthInches <= 17.15) return "XS";
-    else if (chestWidthInches >= 16.75 && chestWidthInches <= 17.9) return "S";
-    else if (chestWidthInches >= 17.5 && chestWidthInches <= 18.7) return "M";
-    else if (chestWidthInches >= 18.3 && chestWidthInches <= 19.5) return "L";
-    else if (chestWidthInches >= 19.1 && chestWidthInches <= 20.3) return "XL";
-    else if (chestWidthInches >= 20.0 && chestWidthInches <= 21.05) return "XXL";
+
+  function recommendedSizeFromChest(chestInches) {
+    // Retaining researched upper thresholds for Eastern sizing:
+    if (chestInches < 17.15) return "XS";
+    else if (chestInches < 17.9) return "S";
+    else if (chestInches < 18.7) return "M";
+    else if (chestInches < 19.5) return "L";
+    else if (chestInches < 20.3) return "XL";
     else return "XXL";
   }
+
   function recommendedSizeFromShoulder(shoulderInches) {
     if (shoulderInches < 16.1) return "XS";
     else if (shoulderInches < 16.9) return "S";
@@ -301,6 +303,7 @@ function recommendedOverallSizeEast(chest, shoulder, hip, thigh) {
     else if (shoulderInches < 19.3) return "XL";
     else return "XXL";
   }
+
   function recommendedSizeFromLength(lengthInches) {
     if (lengthInches < 25.4) return "XS";
     else if (lengthInches < 26.6) return "S";
@@ -309,26 +312,33 @@ function recommendedOverallSizeEast(chest, shoulder, hip, thigh) {
     else if (lengthInches < 29.5) return "XL";
     else return "XXL";
   }
+
+  // Note: as in your original code, the chest measurement is halved.
   const chestSize = recommendedSizeFromChest(chest / 2);
   const shoulderSize = recommendedSizeFromShoulder(shoulder);
   const lengthSize = recommendedSizeFromLength(hip);
+
   const sizes = [chestSize, shoulderSize, lengthSize];
   const numericSizes = sizes.map(size => sizeMapping[size]);
   const maxSizeValue = Math.max(...numericSizes);
   return Object.keys(sizeMapping).find(key => sizeMapping[key] === maxSizeValue);
 }
 
+
+
 function recommendedOverallSizeWest(chest, shoulder, hip, thigh) {
   const sizeMapping = { "XS": 0, "S": 1, "M": 2, "L": 3, "XL": 4, "XXL": 5 };
-  function recommendedSizeFromChest(chestWidthInches) {
-    if (chestWidthInches >= 15.95 && chestWidthInches <= 16.95) return "XS";
-    else if (chestWidthInches >= 16.95 && chestWidthInches <= 17.9) return "S";
-    else if (chestWidthInches >= 17.9 && chestWidthInches <= 18.9) return "M";
-    else if (chestWidthInches >= 18.9 && chestWidthInches <= 19.9) return "L";
-    else if (chestWidthInches >= 19.9 && chestWidthInches <= 21.05) return "XL";
-    else if (chestWidthInches >= 21.05 && chestWidthInches <= 22.25) return "XXL";
+
+  function recommendedSizeFromChest(chestInches) {
+    // Retaining researched upper thresholds for Western sizing:
+    if (chestInches < 16.95) return "XS";
+    else if (chestInches < 17.9) return "S";
+    else if (chestInches < 18.9) return "M";
+    else if (chestInches < 19.9) return "L";
+    else if (chestInches < 21.05) return "XL";
     else return "XXL";
   }
+
   function recommendedSizeFromShoulder(shoulderInches) {
     if (shoulderInches < 16.1) return "XS";
     else if (shoulderInches < 16.9) return "S";
@@ -337,6 +347,7 @@ function recommendedOverallSizeWest(chest, shoulder, hip, thigh) {
     else if (shoulderInches < 19.3) return "XL";
     else return "XXL";
   }
+
   function recommendedSizeFromLength(lengthInches) {
     if (lengthInches < 25.4) return "XS";
     else if (lengthInches < 26.6) return "S";
@@ -345,14 +356,19 @@ function recommendedOverallSizeWest(chest, shoulder, hip, thigh) {
     else if (lengthInches < 29.5) return "XL";
     else return "XXL";
   }
+
+  // As before, we use chest / 2.
   const chestSize = recommendedSizeFromChest(chest / 2);
   const shoulderSize = recommendedSizeFromShoulder(shoulder);
   const lengthSize = recommendedSizeFromLength(hip);
+
   const sizes = [chestSize, shoulderSize, lengthSize];
   const numericSizes = sizes.map(size => sizeMapping[size]);
   const maxSizeValue = Math.max(...numericSizes);
   return Object.keys(sizeMapping).find(key => sizeMapping[key] === maxSizeValue);
 }
+
+
 
 // --- Clothing Selection Functionality ---
 let selectedCloth = null;
@@ -360,18 +376,11 @@ let clothingType = "upper";
 
 document.addEventListener('DOMContentLoaded', function() {
   const clothes = [
-    { src: "/static/images/shirt.jpg", label: "Black Shirt" },
-    { src: "/static/images/uniform.jpg", label: "Brown Shirt" },
-    { src: "/static/images/aaaa.jpg", label: "Plaid Shirt" },
-    { src: "/static/images/jeans.png", label: "Jeans" },
-    { src: "/static/images/shirt.jpg", label: "Black Shirt" },
-    { src: "/static/images/uniform.jpg", label: "Brown Shirt" },
-    { src: "/static/images/aaaa.jpg", label: "Plaid Shirt" },
-    { src: "/static/images/jeans.png", label: "Jeans" },
-    { src: "/static/images/shirt.jpg", label: "Black Shirt" },
-    { src: "/static/images/uniform.jpg", label: "Brown Shirt" },
-    { src: "/static/images/aaaa.jpg", label: "Plaid Shirt" },
-    { src: "/static/images/jeans.png", label: "Jeans" }
+    { src: "/static/images/1.png", label: "Dress 1" },
+    { src: "/static/images/2.png", label: "Dress 2" },
+    { src: "/static/images/3.png", label: "Dress 3" },
+    { src: "/static/images/4.png", label: "Dress 4" },
+    { src: "/static/images/5.png", label: "Dress 5" }
   ];
   const clothesGrid = document.querySelector('.clothes-grid');
   clothes.forEach((cloth, index) => {
