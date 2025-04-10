@@ -22,11 +22,150 @@ document.getElementById('toggleMode').addEventListener('change', function() {
 function handleUploadImage(e) {
   const file = e.target.files[0];
   if (file) {
+    // --- Basic File Validation ---
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSize = 10 * 1024 * 1024; // 10 MB limit
+
+    if (!allowedTypes.includes(file.type)) {
+        alert('Invalid file type. Please upload a JPG, PNG, or WEBP image.');
+        e.target.value = ""; return;
+    }
+    if (file.size > maxSize) {
+        alert(`File is too large. Maximum size is ${maxSize / 1024 / 1024} MB.`);
+        e.target.value = ""; return;
+    }
+    // --- End Validation ---
+
     const url = URL.createObjectURL(file);
     document.querySelector('#uploadContainer .upload-box').style.display = 'none';
     const uploadedImage = document.getElementById('uploadedImage');
     uploadedImage.src = url;
     uploadedImage.style.display = 'block';
+
+    // --- Prepare Measurement Display Areas ---
+    const sizesDiv = document.getElementById('sizes');
+    const apparelSizeDiv = document.getElementById('apparelSize');
+    const apparelSizeEuDiv = document.getElementById('apparelSizeEu');
+    const apparelSizeEnDiv = document.getElementById('apparelSizeEn');
+    sizesDiv.innerHTML = ''; // Clear previous results
+    apparelSizeDiv.innerText = '';
+    apparelSizeEuDiv.innerText = '';
+    apparelSizeEnDiv.innerText = '';
+
+    // --- State variables ---
+    let measurementResult = null;
+    let measurementError = null;
+    let fetchCompleted = false;
+    let simulationFinished = false; // Flag for simulation timer completion
+
+    // --- Modal elements ---
+    const modal = document.getElementById('processingModal');
+    const progressBar = document.getElementById('progressBar');
+
+    // --- Function to check conditions and display results ---
+    function tryDisplayResults() {
+        // Only proceed if BOTH simulation AND fetch are done
+        if (simulationFinished && fetchCompleted) {
+            console.log("Both simulation and fetch completed. Displaying results."); // Debug log
+            modal.style.display = 'none'; // Hide the modal
+
+            // Now display based on the stored results/errors
+            if (measurementError) {
+                sizesDiv.innerHTML = `Error calculating measurements: ${measurementError.message}. Please try again.`;
+                apparelSizeDiv.innerText = 'Error';
+                apparelSizeEuDiv.innerText = 'Error';
+                apparelSizeEnDiv.innerText = 'Error';
+            } else if (measurementResult && Object.values(measurementResult).some(v => v !== null)) {
+                // Valid measurements received
+                displayMeasurements(measurementResult);
+                displayMeasurementsEast(measurementResult);
+                displayMeasurementsWest(measurementResult);
+            } else {
+                // Fetch completed but result was null or empty (e.g., no pose)
+                sizesDiv.innerHTML = 'Could not detect pose or calculate measurements from the uploaded image.';
+                apparelSizeDiv.innerText = 'N/A';
+                apparelSizeEuDiv.innerText = 'N/A';
+                apparelSizeEnDiv.innerText = 'N/A';
+            }
+        } else {
+             console.log(`Display check failed: SimulationFinished=${simulationFinished}, FetchCompleted=${fetchCompleted}`); // Debug log
+        }
+    }
+
+    // --- Show the Processing Modal ---
+    modal.style.display = 'flex';
+    document.getElementById('modalHeader').innerText = "Calculating Measurements...";
+    document.querySelector('.spinner').style.display = 'block';
+    document.querySelector('.progress-container').style.display = 'block';
+    progressBar.style.width = '0%'; // Reset progress bar
+    document.getElementById('processedImageContainer').style.display = 'none';
+    document.getElementById('modalButtons').style.display = 'none';
+
+
+    // --- Start Backend Request IN PARALLEL ---
+    convertURLToBase64(url)
+      .then(base64Image => {
+        return fetch('/calculate_measurements_from_image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64Image })
+        })
+        .then(response => {
+            if (!response.ok) {
+                // Try to parse error message from backend if possible
+                 return response.json().then(err => {
+                    throw new Error(err.error || `HTTP error ${response.status}`);
+                 }).catch(() => {
+                     // Fallback if response is not JSON or has no error field
+                     throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+                 });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("Fetch success:", data); // Log success data
+            measurementResult = data; // Store the result
+        })
+        .catch(error => {
+            console.error('Fetch error:', error); // Log the specific error
+            measurementError = error; // Store the error
+        });
+      })
+      .catch(error => {
+         // Handle Base64 conversion error separately
+         console.error('Base64 Conversion error:', error);
+         measurementError = new Error('Failed to prepare image.'); // Store conversion error
+      })
+      .finally(() => {
+          console.log("Fetch chain finally block executed."); // Debug log
+          fetchCompleted = true; // Mark fetch as done (success or error)
+          URL.revokeObjectURL(url); // Revoke URL when fetch chain settles
+          tryDisplayResults(); // Attempt to display results now that fetch is done
+      });
+
+
+    // --- Start FIXED DURATION Progress Bar Simulation ---
+    const minDuration = 3000;
+    const maxDuration = 5000;
+    const randomDuration = Math.floor(Math.random() * (maxDuration - minDuration + 1)) + minDuration;
+    let elapsedTime = 0;
+    const updateInterval = 50;
+    console.log(`Starting simulation for ${randomDuration}ms`); // Debug log
+
+    const progressIntervalId = setInterval(() => {
+        elapsedTime += updateInterval;
+        const percent = Math.min((elapsedTime / randomDuration) * 100, 100);
+        progressBar.style.width = percent + '%';
+
+        // Check if simulation duration is complete
+        if (elapsedTime >= randomDuration) {
+            clearInterval(progressIntervalId); // Stop the interval
+            progressBar.style.width = '100%'; // Ensure it hits 100%
+            console.log("Simulation finished."); // Debug log
+            simulationFinished = true; // Mark simulation as done
+            tryDisplayResults(); // Attempt to display results now that simulation is done
+        }
+    }, updateInterval);
   }
 }
 
@@ -199,7 +338,7 @@ function displayMeasurements(data) {
   let chestCm = (data['Chest Circumference']).toFixed(2);
   let shoulderCm = (data['Shoulder Width']).toFixed(2);
   let hipCm = (data['Hip Length']).toFixed(2);
-  let thighCm = (data['Thigh Circumference']).toFixed(2);
+  let thighCm = (data['Thigh Circumference'] * 2.54).toFixed(2);
   
   sizesDiv.innerHTML = `
     Chest Circumference: ${chestCm} cm<br>
