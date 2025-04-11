@@ -338,7 +338,7 @@ function displayMeasurements(data) {
   let chestCm = (data['Chest Circumference']).toFixed(2);
   let shoulderCm = (data['Shoulder Width']).toFixed(2);
   let hipCm = (data['Hip Length']).toFixed(2);
-  let thighCm = (data['Thigh Circumference'] * 2.54).toFixed(2);
+  let thighCm = (data['Thigh Circumference'] ).toFixed(2);
   
   sizesDiv.innerHTML = `
     Chest Circumference: ${chestCm} cm<br>
@@ -357,10 +357,10 @@ function displayMeasurements(data) {
 }
 
 function displayMeasurementsEast(data) {
-  let chestCm = (data['Chest Circumference'] * 2.54).toFixed(2);
-  let shoulderCm = (data['Shoulder Width'] * 2.54).toFixed(2);
-  let hipCm = (data['Hip Length'] * 2.54).toFixed(2);
-  let thighCm = (data['Thigh Circumference'] * 2.54).toFixed(2);
+  let chestCm = (data['Chest Circumference'] ).toFixed(2);
+  let shoulderCm = (data['Shoulder Width'] ).toFixed(2);
+  let hipCm = (data['Hip Length'] ).toFixed(2);
+  let thighCm = (data['Thigh Circumference'] ).toFixed(2);
   
   let recommended = recommendedOverallSizeEast(
     parseFloat(chestCm),
@@ -372,10 +372,10 @@ function displayMeasurementsEast(data) {
 }
 
 function displayMeasurementsWest(data) {
-  let chestCm = (data['Chest Circumference'] * 2.54).toFixed(2);
-  let shoulderCm = (data['Shoulder Width'] * 2.54).toFixed(2);
-  let hipCm = (data['Hip Length'] * 2.54).toFixed(2);
-  let thighCm = (data['Thigh Circumference'] * 2.54).toFixed(2);
+  let chestCm = (data['Chest Circumference'] ).toFixed(2);
+  let shoulderCm = (data['Shoulder Width'] ).toFixed(2);
+  let hipCm = (data['Hip Length'] ).toFixed(2);
+  let thighCm = (data['Thigh Circumference'] ).toFixed(2);
   
   let recommended = recommendedOverallSizeWest(
     parseFloat(chestCm),
